@@ -20,9 +20,12 @@ struct MainTabView: View {
                 ZStack {
                     if selectedTab == .home {
                         HomeView(habitStore: habitStore)
-                    } else {
+                    } else if selectedTab == .addHabit {
                         // Add Habit View
                         AddHabitView(habitStore: habitStore)
+                    } else if selectedTab == .profile {
+                        // Profile View
+                        ProfileView(habitStore: habitStore)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
