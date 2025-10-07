@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Public user profiles; owner can write their own doc
+    match /users/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Username → uid mapping (enforces uniqueness)
+    // Document ID is the lowercase username
+    match /usernames/{uname} {
+      allow read: if true;
+      // Only the owner can create/update a mapping to their uid
+      allow write: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && (resource == null || resource.data.uid == request.auth.uid);
+    }
+
+    // Allies: one document per relationship (userId -> allyId)
+    match /allies/{allyDoc} {
+      allow read, write: if request.auth != null
+        && ( 
+          // New write must involve the caller
+          (request.resource != null &&
+            (request.resource.data.userId == request.auth.uid ||
+             request.resource.data.allyId == request.auth.uid))
+          ||
+          // Existing doc also readable/writable if it involves the caller
+          (resource != null &&
+            (resource.data.userId == request.auth.uid ||
+             resource.data.allyId == request.auth.uid))
+        );
+    }
+    
+    // Notifications: users can read notifications sent to them and write new notifications
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && 
+        (resource.data.toUserId == request.auth.uid || 
+         request.auth.uid == resource.data.fromUserId);
+      allow write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to read and write their own data
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

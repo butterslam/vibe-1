@@ -21,7 +21,7 @@ struct CompletionButton: View {
         VStack(alignment: .center, spacing: 8) {
             // Animated completion button
             Button(action: {
-                // Allow toggling both ways
+                // Allow toggling both ways and sync with store
                 onToggle()
                 
                 // Show success text with animation only when marking complete

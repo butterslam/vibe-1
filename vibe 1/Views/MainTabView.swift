@@ -10,7 +10,6 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject var habitStore: HabitStore
     @State private var selectedTab: CustomTabBar.TabSelection = .home
-    @State private var showingAddHabit = false
     
     var body: some View {
         ZStack {
@@ -20,9 +19,8 @@ struct MainTabView: View {
                 ZStack {
                     if selectedTab == .home {
                         HomeView(habitStore: habitStore)
-                    } else if selectedTab == .addHabit {
-                        // Add Habit View
-                        AddHabitView(habitStore: habitStore)
+                    } else if selectedTab == .guilds {
+                        GuildsView()
                     } else if selectedTab == .profile {
                         // Profile View
                         ProfileView(habitStore: habitStore)
@@ -33,15 +31,6 @@ struct MainTabView: View {
                 // Custom Tab Bar
                 CustomTabBar(selectedTab: $selectedTab)
             }
-        }
-        .onChange(of: selectedTab) { _, newTab in
-            if newTab == .addHabit {
-                showingAddHabit = true
-                selectedTab = .home // Reset to home after showing sheet
-            }
-        }
-        .sheet(isPresented: $showingAddHabit) {
-            AddHabitView(habitStore: habitStore)
         }
     }
 }

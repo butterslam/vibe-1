@@ -7,14 +7,26 @@
 
 import SwiftUI
 import PhotosUI
+import AVFoundation
+import FirebaseAuth
 
 struct ProfileView: View {
     @ObservedObject var habitStore: HabitStore
+    @EnvironmentObject var notificationStore: NotificationStore
+    @EnvironmentObject var authManager: AuthManager
     @State private var showingImagePicker = false
+    @State private var showingCameraPicker = false
+    @State private var showingPhotoSource = false
     @State private var selectedImage: UIImage?
     @State private var username = "User"
     @State private var showingUsernameAlert = false
     @State private var tempUsername = ""
+    @State private var showCameraDeniedAlert = false
+    @State private var showPhotosDeniedAlert = false
+    @State private var showingAllies = false
+    @State private var allies: [String] = ["Alex", "Jordan", "Sam"]
+    @State private var showingSettings = false
+    @State private var showingNotifications = false
     
     var currentStreak: Int {
         calculateCurrentStreak()
@@ -25,10 +37,10 @@ struct ProfileView: View {
             ScrollView {
                 VStack(spacing: 32) {
                     // Header Section
-                    VStack(spacing: 20) {
+                    VStack(spacing: 12) {
                         // Profile Picture
                         Button(action: {
-                            showingImagePicker = true
+                            showingPhotoSource = true
                         }) {
                             ZStack {
                                 if let selectedImage = selectedImage {
@@ -47,46 +59,26 @@ struct ProfileView: View {
                                                 .foregroundColor(.secondary)
                                         )
                                 }
-                                
-                                // Add photo overlay
-                                Circle()
-                                    .stroke(Color.blue, lineWidth: 3)
-                                    .frame(width: 120, height: 120)
-                                    .overlay(
-                                        VStack {
-                                            Spacer()
-                                            HStack {
-                                                Spacer()
-                                                Image(systemName: "camera.fill")
-                                                    .font(.system(size: 16, weight: .semibold))
-                                                    .foregroundColor(.white)
-                                                    .frame(width: 32, height: 32)
-                                                    .background(Color.blue)
-                                                    .clipShape(Circle())
-                                                    .offset(x: 8, y: 8)
-                                            }
-                                        }
-                                    )
                             }
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .confirmationDialog("Select Photo", isPresented: $showingPhotoSource, titleVisibility: .visible) {
+                            Button("Take Photo") { requestCameraAndPresent() }
+                            Button("Choose from Library") { requestPhotosAndPresent() }
+                            Button("Cancel", role: .cancel) {}
+                        }
+                        
+                        if selectedImage == nil {
+                            Button("Add photo") { showingPhotoSource = true }
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.blue)
+                        }
                         
                         // Username and Streak
                         VStack(spacing: 12) {
-                            HStack(spacing: 8) {
-                                Text(username)
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.primary)
-                                
-                                Button(action: {
-                                    tempUsername = username
-                                    showingUsernameAlert = true
-                                }) {
-                                    Image(systemName: "pencil")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.blue)
-                                }
-                            }
+                            Text(username)
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.primary)
                             
                             // Streak Display
                             HStack(spacing: 8) {
@@ -101,6 +93,25 @@ struct ProfileView: View {
                             .padding(.vertical, 8)
                             .background(Color.orange.opacity(0.1))
                             .cornerRadius(20)
+
+                            // Allies quick action
+                            Button(action: { showingAllies = true }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "person.2.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Allies • \(allies.count)")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.blue)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.blue)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(18)
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
                     }
                     .padding(.top, 20)
@@ -157,18 +168,156 @@ struct ProfileView: View {
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(selectedImage: $selectedImage)
         }
+        .sheet(isPresented: $showingCameraPicker) {
+            CameraPicker(selectedImage: $selectedImage)
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsSheet(username: $username, authManager: authManager, requestPush: {
+                NotificationManager.shared.requestAuthorization()
+            })
+        }
+        .sheet(isPresented: $showingAllies) {
+            AlliesSheet()
+        }
+        .sheet(isPresented: $showingNotifications) {
+            NotificationsView(notificationStore: notificationStore, habitStore: habitStore)
+        }
         .alert("Change Username", isPresented: $showingUsernameAlert) {
             TextField("Username", text: $tempUsername)
             Button("Cancel", role: .cancel) { }
             Button("Save") {
                 username = tempUsername
                 saveUserData()
+                
+                // Also save to Firebase
+                if let uid = Auth.auth().currentUser?.uid {
+                    Task {
+                        do {
+                            try await AlliesService().upsertUser(uid: uid, username: username, avatarURL: nil)
+                            print("[Firebase] username updated to: \(username)")
+                        } catch {
+                            print("[Firebase] username update failed:", error.localizedDescription)
+                        }
+                    }
+                }
             }
         } message: {
             Text("Enter your username")
         }
         .onAppear {
             loadUserData()
+        }
+        .onChange(of: selectedImage) { _, _ in
+            saveUserData()
+            // Upload avatar to Firebase Storage and save url to Firestore
+            if let image = selectedImage, let uid = Auth.auth().currentUser?.uid {
+                Task {
+                    do {
+                        let url = try await StorageService().uploadAvatar(image: image, for: uid)
+                        try await AlliesService().upsertUser(uid: uid, username: username, avatarURL: url)
+                        print("[Firebase] avatar uploaded & user updated")
+                    } catch {
+                        print("[Firebase] avatar upload/update failed:", error.localizedDescription)
+                    }
+                }
+            }
+        }
+        .overlay(
+            HStack {
+                // Gear on the top-left
+                Button(action: { showingSettings = true }) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 36, height: 36)
+                        .background(Color(.systemGray6))
+                        .clipShape(Circle())
+                }
+                .padding(.leading, 20)
+                .padding(.top, 12)
+                Spacer()
+                // Test notification button (for debugging)
+                Button(action: { 
+                    notificationStore.createTestNotificationForCurrentUser()
+                }) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.blue)
+                        .frame(width: 36, height: 36)
+                        .background(Color(.systemGray6))
+                        .clipShape(Circle())
+                }
+                .padding(.trailing, 8)
+                
+                // Bell on the top-right
+                Button(action: { showingNotifications = true }) {
+                    Image(systemName: "bell")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 36, height: 36)
+                        .background(Color(.systemGray6))
+                        .clipShape(Circle())
+                }
+                .padding(.trailing, 20)
+                .padding(.top, 8)
+            }, alignment: .top
+        )
+        .alert("Camera Access Needed", isPresented: $showCameraDeniedAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Please enable camera access in Settings to take a photo.")
+        }
+        .alert("Photos Access Needed", isPresented: $showPhotosDeniedAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Please enable photo library access in Settings to choose a photo.")
+        }
+    }
+
+    private func requestCameraAndPresent() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            showingCameraPicker = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted { showingCameraPicker = true } else { showCameraDeniedAlert = true }
+                }
+            }
+        default:
+            showCameraDeniedAlert = true
+        }
+    }
+    
+    private func requestPhotosAndPresent() {
+        if #available(iOS 14, *) {
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            switch status {
+            case .authorized, .limited:
+                showingImagePicker = true
+            case .notDetermined:
+                PHPhotoLibrary.requestAuthorization(for: .readWrite) { newStatus in
+                    DispatchQueue.main.async {
+                        if newStatus == .authorized || newStatus == .limited { showingImagePicker = true } else { showPhotosDeniedAlert = true }
+                    }
+                }
+            default:
+                showPhotosDeniedAlert = true
+            }
+        } else {
+            let status = PHPhotoLibrary.authorizationStatus()
+            switch status {
+            case .authorized:
+                showingImagePicker = true
+            case .notDetermined:
+                PHPhotoLibrary.requestAuthorization { newStatus in
+                    DispatchQueue.main.async {
+                        if newStatus == .authorized { showingImagePicker = true } else { showPhotosDeniedAlert = true }
+                    }
+                }
+            default:
+                showPhotosDeniedAlert = true
+            }
         }
     }
     
@@ -318,6 +467,430 @@ struct ImagePicker: UIViewControllerRepresentable {
                 }
             }
         }
+    }
+}
+
+// Camera picker
+struct CameraPicker: UIViewControllerRepresentable {
+    @Binding var selectedImage: UIImage?
+    @Environment(\.dismiss) private var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        picker.allowsEditing = false
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    
+    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: CameraPicker
+        init(_ parent: CameraPicker) { self.parent = parent }
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.selectedImage = image
+            }
+            picker.dismiss(animated: true) { self.parent.dismiss() }
+        }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { picker.dismiss(animated: true) { self.parent.dismiss() } }
+    }
+}
+
+// MARK: - Settings Sheet
+
+import FirebaseAuth
+
+struct SettingsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var username: String
+    @ObservedObject var authManager: AuthManager
+    var requestPush: () -> Void
+    @State private var editingUsername: String = ""
+    @State private var showingSignOutAlert = false
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Profile")) {
+                    HStack {
+                        Text("Username")
+                        Spacer()
+                        TextField("Username", text: $editingUsername)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    Button("Save Username") {
+                        username = editingUsername
+                        let service = AlliesService()
+                        if let uid = Auth.auth().currentUser?.uid {
+                            Task {
+                                do {
+                                    try await service.upsertUser(uid: uid, username: editingUsername, avatarURL: nil)
+                                    print("[Firebase] upsertUser ok for", uid)
+                                } catch {
+                                    print("[Firebase] upsertUser error:", error.localizedDescription)
+                                }
+                            }
+                        } else {
+                            print("[Firebase] No signed-in user; cannot write")
+                        }
+                    }
+                }
+                Section(header: Text("Notifications")) {
+                    Button("Activate push notifications") {
+                        requestPush()
+                    }
+                }
+                Section {
+                    Button("Log out of account") {
+                        showingSignOutAlert = true
+                    }
+                        .foregroundColor(.red)
+                    Button("Delete account and all information") {}
+                        .foregroundColor(.red)
+                }
+            }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
+            }
+            .onAppear { editingUsername = username }
+            .alert("Sign Out", isPresented: $showingSignOutAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Sign Out", role: .destructive) {
+                    do {
+                        try authManager.signOut()
+                        dismiss()
+                    } catch {
+                        print("Error signing out: \(error.localizedDescription)")
+                    }
+                }
+            } message: {
+                Text("Are you sure you want to sign out?")
+            }
+        }
+    }
+}
+
+// Allies UI
+struct AlliesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText: String = ""
+    @State private var results: [AlliesService.User] = []
+    @State private var isSearching = false
+    @State private var pendingSearch: DispatchWorkItem?
+    @State private var contactsAuthNotAuthorized = false
+    @State private var showingContactsPrompt = false
+    private let service = AlliesService()
+
+    private func performSearch() {
+        isSearching = true
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task {
+            do {
+                var fetched = try await service.searchUsers(prefix: query)
+                if let uid = Auth.auth().currentUser?.uid {
+                    fetched.removeAll { $0.id == uid }
+                }
+                results = fetched
+            } catch {
+                results = []
+            }
+            isSearching = false
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Contacts invite prompt if permission not granted
+                    if contactsAuthNotAuthorized {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Invite from Contacts")
+                                .font(.system(size: 16, weight: .semibold))
+                            Button(action: { requestContactsAccess() }) {
+                                HStack {
+                                    Image(systemName: "person.crop.circle.badge.plus")
+                                    Text("Invite contacts")
+                                        .font(.system(size: 16, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .cornerRadius(12)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                    // Search card
+                    HStack(spacing: 10) {
+                        Text("🔎")
+                            .font(.system(size: 22))
+                            .frame(width: 44, height: 44)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                        TextField("Search an Ally's username", text: $searchText)
+                            .padding(12)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .keyboardType(.asciiCapable)
+                    }
+                    .padding(.horizontal, 16)
+                    
+                    // Allies results list
+                    VStack(alignment: .leading, spacing: 8) {
+                        if isSearching {
+                            ProgressView().padding(.horizontal, 16)
+                        }
+                        ForEach(results) { user in
+                            HStack {
+                                if let urlStr = user.avatarURL, let url = URL(string: urlStr) {
+                                    AsyncImage(url: url) { image in
+                                        image.resizable().scaledToFill()
+                                    } placeholder: {
+                                        ProgressView()
+                                    }
+                                    .frame(width: 36, height: 36)
+                                    .clipShape(Circle())
+                                } else {
+                                    Circle().fill(Color(.systemGray5)).frame(width: 36, height: 36)
+                                        .overlay(Text(String(user.username.prefix(1))).font(.system(size: 16, weight: .bold)))
+                                }
+                                Text(user.username)
+                                    .font(.system(size: 16, weight: .semibold))
+                                Spacer()
+                                if user.id != Auth.auth().currentUser?.uid {
+                                    Button("Add") {
+                                        // Add ally call can be wired after Auth is added
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .background(Color(.systemBackground))
+                            .cornerRadius(12)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray5), lineWidth: 1))
+                            .shadow(color: Color.black.opacity(0.04), radius: 1, x: 0, y: 1)
+                            .padding(.horizontal, 16)
+                        }
+                    }
+                    
+                    // Invite section
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Invite an Ally to join this app")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 16)
+                        Button(action: {}) {
+                            Text("Create Invite Link")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .cornerRadius(14)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 20)
+                    }
+                }
+            }
+            .navigationTitle("Your Allies")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .onChange(of: searchText) { _, _ in
+                // Debounce to avoid spamming queries and reduce keyboard subsystem logs
+                pendingSearch?.cancel()
+                let work = DispatchWorkItem { performSearch() }
+                pendingSearch = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+            }
+            .task {
+                // Show prompt when not authorized yet
+                contactsAuthNotAuthorized = CNContactStore.authorizationStatus(for: .contacts) != .authorized
+            }
+        }
+    }
+}
+
+import Contacts
+
+extension AlliesSheet {
+    private func requestContactsAccess() {
+        let store = CNContactStore()
+        switch CNContactStore.authorizationStatus(for: .contacts) {
+        case .authorized:
+            // Already authorized; proceed to contacts invite flow
+            print("Contacts already authorized")
+        case .notDetermined:
+            store.requestAccess(for: .contacts) { granted, _ in
+                DispatchQueue.main.async {
+                    contactsAuthNotAuthorized = !granted
+                }
+            }
+        default:
+            // Denied or restricted
+            contactsAuthNotAuthorized = true
+        }
+    }
+}
+
+// MARK: - Notifications View
+struct NotificationsView: View {
+    @ObservedObject var notificationStore: NotificationStore
+    @ObservedObject var habitStore: HabitStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedNotification: AppNotification?
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                if notificationStore.notifications.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "bell")
+                            .font(.system(size: 30))
+                            .foregroundColor(.secondary)
+                        Text("No notifications yet")
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemGroupedBackground))
+                } else {
+                    List {
+                        ForEach(notificationStore.notifications) { notification in
+                            NotificationRow(notification: notification, notificationStore: notificationStore)
+                                .onTapGesture {
+                                    if notification.type == .allyInvitation {
+                                        selectedNotification = notification
+                                    }
+                                }
+                        }
+                        .onDelete(perform: deleteNotifications)
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("Notifications")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+                if !notificationStore.notifications.isEmpty {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Mark All Read") {
+                            notificationStore.markAllAsRead()
+                        }
+                        .font(.system(size: 16, weight: .medium))
+                    }
+                }
+            }
+        .onAppear {
+            notificationStore.fetchNotificationsFromFirebase()
+        }
+        }
+    }
+    
+    private func deleteNotifications(offsets: IndexSet) {
+        for index in offsets {
+            let notification = notificationStore.notifications[index]
+            notificationStore.deleteNotification(notification)
+        }
+    }
+}
+
+// MARK: - Notification Row
+struct NotificationRow: View {
+    let notification: AppNotification
+    @ObservedObject var notificationStore: NotificationStore
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Profile picture or icon
+            if notification.type == .allyInvitation, let avatarURL = notification.fromUserAvatarURL, !avatarURL.isEmpty {
+                // Show sender's profile picture for ally invitations
+                AsyncImage(url: URL(string: avatarURL)) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    Image(systemName: "person.circle.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(.gray)
+                }
+                .frame(width: 32, height: 32)
+                .clipShape(Circle())
+            } else {
+                // Show generic icon for other notification types
+                Image(systemName: notification.type.icon)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(colorForType(notification.type))
+                    .frame(width: 32, height: 32)
+                    .background(colorForType(notification.type).opacity(0.1))
+                    .clipShape(Circle())
+            }
+            
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                Text(notification.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Text(notification.message)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                
+                Text(timeAgoString(from: notification.timestamp))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            // Unread indicator
+            if !notification.isRead {
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 8, height: 8)
+            }
+        }
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if !notification.isRead {
+                            notificationStore.markAsRead(notification)
+                        }
+                    }
+                    .background(
+                        notification.type == .allyInvitation ? 
+                        Color.blue.opacity(0.05) : Color.clear
+                    )
+    }
+    
+    private func colorForType(_ type: NotificationType) -> Color {
+        switch type {
+        case .allyInvitation:
+            return .blue
+        case .habitReminder:
+            return .orange
+        case .achievement:
+            return .yellow
+        }
+    }
+    
+    private func timeAgoString(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 

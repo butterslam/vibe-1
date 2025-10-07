@@ -12,7 +12,7 @@ struct CustomTabBar: View {
     
     enum TabSelection {
         case home
-        case addHabit
+        case guilds
         case profile
     }
     
@@ -34,16 +34,16 @@ struct CustomTabBar: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            // Add Habit Tab
-            Button(action: { selectedTab = .addHabit }) {
+            // Guilds Tab
+            Button(action: { selectedTab = .guilds }) {
                 VStack(spacing: 6) {
-                    Image(systemName: selectedTab == .addHabit ? "plus.circle.fill" : "plus.circle")
+                    Image(systemName: selectedTab == .guilds ? "person.3.fill" : "person.3")
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(selectedTab == .addHabit ? .blue : .secondary)
+                        .foregroundColor(selectedTab == .guilds ? .blue : .secondary)
                     
-                    Text("Add Habit")
+                    Text("Guilds")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(selectedTab == .addHabit ? .blue : .secondary)
+                        .foregroundColor(selectedTab == .guilds ? .blue : .secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)

@@ -13,7 +13,7 @@ class HabitStore: ObservableObject {
     @Published var selectedDate: Date = Date()
     
     private let eventStore = EKEventStore()
-    
+     
     init() {
         loadHabits()
     }
@@ -22,7 +22,6 @@ class HabitStore: ObservableObject {
         habits.append(habit)
         saveHabits()
         addToCalendar(habit)
-        
         // Schedule notification for the new habit
         NotificationManager.shared.scheduleNotification(for: habit)
     }
@@ -39,12 +38,16 @@ class HabitStore: ObservableObject {
         saveHabits()
     }
     
-    func updateHabit(_ habit: Habit, name: String, timeOfDay: Date, selectedDays: [String]) {
+    func updateHabit(_ habit: Habit, name: String, timeOfDay: Date, selectedDays: [String], colorIndex: Int, descriptionText: String?, invitedAllies: [String]?, reminderEnabled: Bool) {
         if let index = habits.firstIndex(where: { $0.id == habit.id }) {
             habits[index].name = name
             habits[index].timeOfDay = timeOfDay
             habits[index].selectedDays = selectedDays
             habits[index].frequencyPerWeek = selectedDays.count
+            habits[index].colorIndex = colorIndex
+            habits[index].descriptionText = descriptionText
+            habits[index].invitedAllies = invitedAllies
+            habits[index].reminderEnabled = reminderEnabled
             saveHabits()
             
             // Reschedule notification for the updated habit
@@ -55,13 +58,40 @@ class HabitStore: ObservableObject {
     func toggleHabitCompletion(_ habit: Habit) {
         if let index = habits.firstIndex(where: { $0.id == habit.id }) {
             habits[index].isCompletedToday.toggle()
+            let todayKey = Self.dateKey(Date())
             if habits[index].isCompletedToday {
                 habits[index].completedDate = Date()
+                habits[index].completedDates.insert(todayKey)
             } else {
                 habits[index].completedDate = nil
+                habits[index].completedDates.remove(todayKey)
             }
             saveHabits()
         }
+    }
+
+    // Toggle completion for a specific day (used by calendar UI)
+    func toggleHabit(_ habit: Habit, on date: Date) {
+        guard let index = habits.firstIndex(where: { $0.id == habit.id }) else { return }
+        let key = Self.dateKey(date)
+        if habits[index].completedDates.contains(key) {
+            habits[index].completedDates.remove(key)
+        } else {
+            habits[index].completedDates.insert(key)
+        }
+        // Update today convenience flags
+        let todayKey = Self.dateKey(Date())
+        habits[index].isCompletedToday = habits[index].completedDates.contains(todayKey)
+        habits[index].completedDate = habits[index].isCompletedToday ? Date() : nil
+        saveHabits()
+    }
+
+    static func dateKey(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar.current
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
     
     private func saveHabits() {

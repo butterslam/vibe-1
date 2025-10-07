@@ -17,8 +17,15 @@ struct Habit: Identifiable, Codable {
     var createdAt: Date
     var isCompletedToday: Bool = false
     var completedDate: Date?
+    var colorIndex: Int = 0 // Index for habit color
+    // New per-day completion tracking (keys formatted as yyyy-MM-dd in current calendar)
+    var completedDates: Set<String> = []
+    // New fields
+    var descriptionText: String? = nil
+    var invitedAllies: [String]? = []
+    var reminderEnabled: Bool = true
     
-    init(name: String, selectedDays: [String], timeOfDay: Date, frequencyPerWeek: Int, commitmentLevel: Int) {
+    init(name: String, selectedDays: [String], timeOfDay: Date, frequencyPerWeek: Int, commitmentLevel: Int, colorIndex: Int = 0, completedDates: Set<String> = [], descriptionText: String? = nil, invitedAllies: [String]? = [], reminderEnabled: Bool = true) {
         self.id = UUID()
         self.name = name
         self.selectedDays = selectedDays
@@ -28,6 +35,11 @@ struct Habit: Identifiable, Codable {
         self.createdAt = Date()
         self.isCompletedToday = false
         self.completedDate = nil
+        self.colorIndex = colorIndex
+        self.completedDates = completedDates
+        self.descriptionText = descriptionText
+        self.invitedAllies = invitedAllies
+        self.reminderEnabled = reminderEnabled
     }
     
     // Legacy support for old format
