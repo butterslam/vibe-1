@@ -35,7 +35,7 @@ struct HabitInvitationView: View {
                     // Inviter and invited users section
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
-                            Text("Created by")
+                            Text("Life")
                                 .font(.headline)
                                 .foregroundColor(.primary)
                             Spacer()
