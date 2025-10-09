@@ -9,11 +9,17 @@ import SwiftUI
 
 struct CustomTabBar: View {
     @Binding var selectedTab: TabSelection
+    @ObservedObject var notificationStore: NotificationStore
     
     enum TabSelection {
         case home
         case guilds
+        case notifications
         case profile
+    }
+    
+    private var hasUnreadNotifications: Bool {
+        return notificationStore.unreadCount > 0
     }
     
     var body: some View {
@@ -50,6 +56,32 @@ struct CustomTabBar: View {
             }
             .buttonStyle(PlainButtonStyle())
             
+            // Notifications Tab
+            Button(action: { selectedTab = .notifications }) {
+                VStack(spacing: 6) {
+                    ZStack {
+                        Image(systemName: selectedTab == .notifications ? "bell.fill" : "bell")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(selectedTab == .notifications ? .blue : .secondary)
+                        
+                        // Notification badge
+                        if hasUnreadNotifications {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 8, height: 8)
+                                .offset(x: 8, y: -8)
+                        }
+                    }
+                    
+                    Text("Notifications")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(selectedTab == .notifications ? .blue : .secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
             // Profile Tab
             Button(action: { selectedTab = .profile }) {
                 VStack(spacing: 6) {
@@ -77,5 +109,5 @@ struct CustomTabBar: View {
 }
 
 #Preview {
-    CustomTabBar(selectedTab: .constant(.home))
+    CustomTabBar(selectedTab: .constant(.home), notificationStore: NotificationStore())
 }

@@ -10,6 +10,7 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject var habitStore: HabitStore
     @EnvironmentObject var authManager: AuthManager
+    @StateObject private var notificationStore = NotificationStore()
     @State private var selectedTab: CustomTabBar.TabSelection = .home
     
     var body: some View {
@@ -22,6 +23,9 @@ struct MainTabView: View {
                         HomeView(habitStore: habitStore)
                     } else if selectedTab == .guilds {
                         GuildsView()
+                    } else if selectedTab == .notifications {
+                        NotificationsView()
+                            .environmentObject(notificationStore)
                     } else if selectedTab == .profile {
                         // Profile View
                         ProfileView(habitStore: habitStore)
@@ -31,7 +35,7 @@ struct MainTabView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 
                 // Custom Tab Bar
-                CustomTabBar(selectedTab: $selectedTab)
+                CustomTabBar(selectedTab: $selectedTab, notificationStore: notificationStore)
             }
         }
     }

@@ -599,7 +599,14 @@ struct AlliesSheet: View {
                                 Spacer()
                                 if user.id != Auth.auth().currentUser?.uid {
                                     Button("Add") {
-                                        // Add ally call can be wired after Auth is added
+                                        Task {
+                                            do {
+                                                try await NotificationStore().sendAllyInvitation(toUserId: user.id)
+                                                print("Ally invitation sent to \(user.username)")
+                                            } catch {
+                                                print("Error sending ally invitation: \(error.localizedDescription)")
+                                            }
+                                        }
                                     }
                                 }
                             }

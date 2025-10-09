@@ -425,7 +425,25 @@ struct AddHabitView: View {
         
         habitStore.addHabit(newHabit)
         
-        // Notifications removed
+        // Send habit invitations to allies
+        if !invitedNames.isEmpty {
+            for allyName in invitedNames {
+                if let allyUserId = invitedAllyData[allyName] {
+                    Task {
+                        do {
+                            try await NotificationStore().sendHabitInvitation(
+                                habitName: habitName,
+                                toUserId: allyUserId,
+                                habitId: newHabit.id.uuidString
+                            )
+                            print("Habit invitation sent to \(allyName)")
+                        } catch {
+                            print("Error sending habit invitation: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            }
+        }
         
         // Show confetti animation
         withAnimation(.easeInOut(duration: 0.3)) {
