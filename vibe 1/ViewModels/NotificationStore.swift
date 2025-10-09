@@ -32,9 +32,15 @@ class NotificationStore: ObservableObject {
     
     private func setupAuthListener() {
         Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            print("🔔 NotificationStore Auth State Changed:")
+            print("   User: \(user?.uid ?? "nil")")
+            print("   Email: \(user?.email ?? "nil")")
+            
             if let user = user {
+                print("   Loading notifications for user: \(user.uid)")
                 self?.loadNotifications(for: user.uid)
             } else {
+                print("   No user - clearing notifications")
                 self?.clearNotifications()
             }
         }
@@ -49,6 +55,7 @@ class NotificationStore: ObservableObject {
     // MARK: - Load Notifications
     
     private func loadNotifications(for userId: String) {
+        print("🔔 Loading notifications for userId: \(userId)")
         notificationsListener?.remove()
         isLoading = true
         
@@ -61,7 +68,9 @@ class NotificationStore: ObservableObject {
                 self.isLoading = false
                 
                 if let error = error {
-                    print("Error loading notifications: \(error.localizedDescription)")
+                    print("❌ Error loading notifications: \(error.localizedDescription)")
+                    print("   User ID: \(userId)")
+                    print("   Error details: \(error)")
                     return
                 }
                 

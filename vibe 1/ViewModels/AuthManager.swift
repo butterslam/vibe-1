@@ -23,6 +23,11 @@ final class AuthManager: ObservableObject {
     init() {
         // Listen for auth state changes
         authHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            print("🔥 Firebase Auth State Changed:")
+            print("   User: \(user?.uid ?? "nil")")
+            print("   Email: \(user?.email ?? "nil")")
+            print("   Is Authenticated: \(user != nil)")
+            
             self?.currentUser = user
             self?.isAuthenticated = user != nil
         }

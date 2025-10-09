@@ -6,10 +6,16 @@
 //
 
 import SwiftUI
+import FirebaseFirestore
+import FirebaseAuth
 
 struct NotificationsView: View {
     @EnvironmentObject var notificationStore: NotificationStore
     @State private var selectedFilter: NotificationFilter = .all
+    @State private var showingHabitInvitation: Bool = false
+    @State private var selectedHabit: Habit?
+    @State private var selectedInviterUsername: String = ""
+    @State private var selectedInvitedUsers: [InvitedUser] = []
     
     enum NotificationFilter: String, CaseIterable {
         case all = "All"
@@ -94,17 +100,120 @@ struct NotificationsView: View {
                     .disabled(notificationStore.notifications.filter { !$0.isRead }.isEmpty)
                 }
             }
+            .sheet(isPresented: $showingHabitInvitation) {
+                if let habit = selectedHabit {
+                    HabitInvitationView(
+                        habit: habit,
+                        inviterUsername: selectedInviterUsername,
+                        invitedUsers: selectedInvitedUsers
+                    )
+                }
+            }
         }
     }
     
     private func handleNotificationTap(_ notification: AppNotification) {
+        // Mark notification as read
         Task {
             do {
-                try await notificationStore.handleNotificationAction(notification)
+                try await notificationStore.markAsRead(notification)
             } catch {
-                print("Error handling notification action: \(error.localizedDescription)")
+                print("Error marking notification as read: \(error.localizedDescription)")
             }
         }
+        
+        // Handle different notification types
+        switch notification.type {
+        case .habitInvitation:
+            handleHabitInvitationTap(notification)
+        case .allyInvitation:
+            // Handle ally invitation (could show profile or accept/decline)
+            print("Ally invitation tapped")
+        case .habitCompleted:
+            // Handle habit completed (could show habit details)
+            print("Habit completed notification tapped")
+        case .allyAccepted:
+            // Handle ally accepted
+            print("Ally accepted notification tapped")
+        case .guildInvitation, .guildChallenge, .system:
+            // Handle other notification types
+            print("Other notification type tapped: \(notification.type)")
+        }
+    }
+    
+    private func handleHabitInvitationTap(_ notification: AppNotification) {
+        print("🔔 Habit invitation tapped:")
+        print("   Notification ID: \(notification.id ?? "nil")")
+        print("   Habit ID: \(notification.habitId ?? "nil")")
+        print("   Sender Username: \(notification.senderUsername ?? "nil")")
+        print("   Recipient User ID: \(notification.recipientUserId)")
+        print("   Current User: \(Auth.auth().currentUser?.uid ?? "nil")")
+        
+        guard let habitId = notification.habitId,
+              let senderUsername = notification.senderUsername else {
+            print("❌ Missing habit ID or sender username for habit invitation")
+            return
+        }
+        
+        // Fetch habit data from Firebase
+        Task {
+            do {
+                print("🔍 Fetching habit data for habitId: \(habitId)")
+                let habit = try await fetchHabitFromFirebase(habitId: habitId)
+                let invitedUsers = try await fetchInvitedUsersForHabit(habitId: habitId)
+                
+                await MainActor.run {
+                    selectedHabit = habit
+                    selectedInviterUsername = senderUsername
+                    selectedInvitedUsers = invitedUsers
+                    showingHabitInvitation = true
+                }
+            } catch {
+                print("❌ Error fetching habit data: \(error.localizedDescription)")
+                print("   Error details: \(error)")
+            }
+        }
+    }
+    
+    private func fetchHabitFromFirebase(habitId: String) async throws -> Habit {
+        print("🔍 Attempting to fetch habit from Firebase:")
+        print("   Habit ID: \(habitId)")
+        print("   Current User: \(Auth.auth().currentUser?.uid ?? "nil")")
+        
+        let db = Firestore.firestore()
+        let document = try await db.collection("habits").document(habitId).getDocument()
+        
+        print("   Document exists: \(document.exists)")
+        print("   Document data: \(document.data() ?? [:])")
+        
+        guard let data = document.data() else {
+            print("❌ No document data found")
+            throw NSError(domain: "NotificationsView", code: 1, userInfo: [NSLocalizedDescriptionKey: "Habit not found"])
+        }
+        
+        // Convert Firebase data to Habit object
+        return Habit(
+            name: data["name"] as? String ?? "",
+            selectedDays: data["selectedDays"] as? [String] ?? [],
+            timeOfDay: (data["timeOfDay"] as? Timestamp)?.dateValue() ?? Date(),
+            frequencyPerWeek: data["frequencyPerWeek"] as? Int ?? 0,
+            commitmentLevel: data["commitmentLevel"] as? Int ?? 1,
+            colorIndex: data["colorIndex"] as? Int ?? 0,
+            completedDates: Set(data["completedDates"] as? [String] ?? []),
+            descriptionText: data["descriptionText"] as? String,
+            invitedAllies: data["invitedAllies"] as? [String],
+            reminderEnabled: data["reminderEnabled"] as? Bool ?? true,
+            createdByUserId: data["createdByUserId"] as? String
+        )
+    }
+    
+    private func fetchInvitedUsersForHabit(habitId: String) async throws -> [InvitedUser] {
+        // For now, return mock data. In a real implementation, you'd fetch this from Firebase
+        // based on the habit's invitedAllies array and their response status
+        return [
+            InvitedUser(username: "alex", status: .pending),
+            InvitedUser(username: "sam", status: .accepted)
+        ]
     }
     
     private func dismissNotification(_ notification: AppNotification) {
@@ -152,21 +261,51 @@ struct NotificationCard: View {
     var body: some View {
         HStack(spacing: 12) {
             // Avatar
-            AsyncImage(url: URL(string: notification.senderAvatarURL ?? "")) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
+            if let avatarURL = notification.senderAvatarURL, let url = URL(string: avatarURL) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        Circle()
+                            .fill(Color(.systemGray5))
+                            .overlay(
+                                Image(systemName: notification.type.icon)
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            )
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure(_):
+                        Circle()
+                            .fill(Color(.systemGray5))
+                            .overlay(
+                                Image(systemName: notification.type.icon)
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            )
+                    @unknown default:
+                        Circle()
+                            .fill(Color(.systemGray5))
+                            .overlay(
+                                Image(systemName: notification.type.icon)
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            )
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .clipShape(Circle())
+            } else {
                 Circle()
                     .fill(Color(.systemGray5))
+                    .frame(width: 44, height: 44)
                     .overlay(
                         Image(systemName: notification.type.icon)
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.secondary)
                     )
             }
-            .frame(width: 44, height: 44)
-            .clipShape(Circle())
             
             // Content
             VStack(alignment: .leading, spacing: 4) {

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AuthView: View {
-    @StateObject private var authManager = AuthManager()
+    @EnvironmentObject var authManager: AuthManager
     @State private var isSignUp = false
     @State private var email = ""
     @State private var password = ""
@@ -176,4 +176,5 @@ struct AuthView: View {
 
 #Preview {
     AuthView()
+        .environmentObject(AuthManager())
 }

@@ -583,10 +583,19 @@ struct AlliesSheet: View {
                         ForEach(results) { user in
                             HStack {
                                 if let urlStr = user.avatarURL, let url = URL(string: urlStr) {
-                                    AsyncImage(url: url) { image in
-                                        image.resizable().scaledToFill()
-                                    } placeholder: {
-                                        ProgressView()
+                                    AsyncImage(url: url) { phase in
+                                        switch phase {
+                                        case .empty:
+                                            ProgressView()
+                                        case .success(let image):
+                                            image.resizable().scaledToFill()
+                                        case .failure(_):
+                                            Circle().fill(Color(.systemGray5))
+                                                .overlay(Text(String(user.username.prefix(1))).font(.system(size: 16, weight: .bold)))
+                                        @unknown default:
+                                            Circle().fill(Color(.systemGray5))
+                                                .overlay(Text(String(user.username.prefix(1))).font(.system(size: 16, weight: .bold)))
+                                        }
                                     }
                                     .frame(width: 36, height: 36)
                                     .clipShape(Circle())
