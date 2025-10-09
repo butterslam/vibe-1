@@ -16,6 +16,7 @@ struct NotificationsView: View {
     @State private var selectedHabit: Habit?
     @State private var selectedInviterUsername: String = ""
     @State private var selectedInvitedUsers: [InvitedUser] = []
+    @State private var isLoadingHabitData: Bool = false
     
     enum NotificationFilter: String, CaseIterable {
         case all = "All"
@@ -101,12 +102,42 @@ struct NotificationsView: View {
                 }
             }
             .sheet(isPresented: $showingHabitInvitation) {
-                if let habit = selectedHabit {
+                if isLoadingHabitData {
+                    // Show loading view while fetching data
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Loading habit details...")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemBackground))
+                } else if let habit = selectedHabit {
                     HabitInvitationView(
                         habit: habit,
                         inviterUsername: selectedInviterUsername,
                         invitedUsers: selectedInvitedUsers
                     )
+                } else {
+                    // Show error state
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 48))
+                            .foregroundColor(.orange)
+                        Text("Unable to load habit details")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        Text("Please try again later")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Button("Close") {
+                            showingHabitInvitation = false
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemBackground))
                 }
             }
         }
@@ -155,6 +186,11 @@ struct NotificationsView: View {
             return
         }
         
+        // Show loading state immediately
+        isLoadingHabitData = true
+        selectedHabit = nil
+        showingHabitInvitation = true
+        
         // Fetch habit data from Firebase
         Task {
             do {
@@ -166,11 +202,16 @@ struct NotificationsView: View {
                     selectedHabit = habit
                     selectedInviterUsername = senderUsername
                     selectedInvitedUsers = invitedUsers
-                    showingHabitInvitation = true
+                    isLoadingHabitData = false
                 }
             } catch {
                 print("❌ Error fetching habit data: \(error.localizedDescription)")
                 print("   Error details: \(error)")
+                
+                await MainActor.run {
+                    isLoadingHabitData = false
+                    selectedHabit = nil
+                }
             }
         }
     }
