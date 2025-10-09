@@ -13,7 +13,6 @@ import FirebaseFirestore
 @main
 struct vibe_1App: App {
     @StateObject private var habitStore = HabitStore()
-    @StateObject private var notificationStore = NotificationStore()
     @StateObject private var authManager = AuthManager()
     
     init() {
@@ -23,8 +22,7 @@ struct vibe_1App: App {
         // FirebaseConfiguration.shared.setLoggerLevel(.debug)
         // Firestore logging (enabled by default on debug builds)
         _ = Firestore.firestore()
-        // Request notification permission on app launch
-        NotificationManager.shared.requestAuthorization()
+        // Notifications removed
         
         // Development: Force sign out on app launch to test login flow
         #if DEBUG
@@ -38,14 +36,7 @@ struct vibe_1App: App {
             if authManager.isAuthenticated {
                 ContentView()
                     .environmentObject(habitStore)
-                    .environmentObject(notificationStore)
                     .environmentObject(authManager)
-                    .onAppear {
-                        // Schedule notifications for all habits when app appears
-                        NotificationManager.shared.rescheduleAllNotifications(for: habitStore.habits)
-                        // Note: Firebase notifications will be fetched when user opens notifications tab
-                        // to avoid permission errors on app startup
-                    }
             } else {
                 AuthView()
                     .environmentObject(authManager)

@@ -10,6 +10,7 @@
 		26A334372E92DE9F001ADEE9 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 26A334362E92DE9F001ADEE9 /* FirebaseAuth */; };
 		26A334392E92DE9F001ADEE9 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 26A334382E92DE9F001ADEE9 /* FirebaseFirestore */; };
 		26A3343B2E92DE9F001ADEE9 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 26A3343A2E92DE9F001ADEE9 /* FirebaseStorage */; };
+		26F50B1E2E96ADE9008E66F3 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 26F50B1D2E96ADE9008E66F3 /* FirebaseCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +61,7 @@
 			files = (
 				26A334372E92DE9F001ADEE9 /* FirebaseAuth in Frameworks */,
 				26A334392E92DE9F001ADEE9 /* FirebaseFirestore in Frameworks */,
+				26F50B1E2E96ADE9008E66F3 /* FirebaseCore in Frameworks */,
 				26A3343B2E92DE9F001ADEE9 /* FirebaseStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -124,6 +126,7 @@
 				26A334362E92DE9F001ADEE9 /* FirebaseAuth */,
 				26A334382E92DE9F001ADEE9 /* FirebaseFirestore */,
 				26A3343A2E92DE9F001ADEE9 /* FirebaseStorage */,
+				26F50B1D2E96ADE9008E66F3 /* FirebaseCore */,
 			);
 			productName = "vibe 1";
 			productReference = 26A333CF2E91AAE7001ADEE9 /* vibe 1.app */;
@@ -602,6 +605,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 26A334352E92DE9F001ADEE9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		26F50B1D2E96ADE9008E66F3 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 26A334352E92DE9F001ADEE9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

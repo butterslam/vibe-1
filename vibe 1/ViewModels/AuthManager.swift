@@ -1,7 +1,7 @@
 //
 //  AuthManager.swift
 //  vibe 1
-//
+//awdawdawdawdawdawdawdawd
 //  Created by Jamie Cheatham on 10/4/25.
 //
 
@@ -9,7 +9,8 @@ import Foundation
 import FirebaseAuth
 import FirebaseFirestore
 
-class AuthManager: ObservableObject {
+@MainActor
+final class AuthManager: ObservableObject {
     @Published var isAuthenticated = false
     @Published var currentUser: User?
     @Published var isLoading = false
@@ -17,13 +18,13 @@ class AuthManager: ObservableObject {
     
     private let db = Firestore.firestore()
     
+    private var authHandle: AuthStateDidChangeListenerHandle?
+    
     init() {
         // Listen for auth state changes
-        Auth.auth().addStateDidChangeListener { [weak self] _, user in
-            DispatchQueue.main.async {
-                self?.currentUser = user
-                self?.isAuthenticated = user != nil
-            }
+        authHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            self?.currentUser = user
+            self?.isAuthenticated = user != nil
         }
     }
     

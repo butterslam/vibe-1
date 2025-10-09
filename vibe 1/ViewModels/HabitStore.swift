@@ -22,17 +22,10 @@ class HabitStore: ObservableObject {
         habits.append(habit)
         saveHabits()
         addToCalendar(habit)
-        // Schedule notification for the new habit
-        NotificationManager.shared.scheduleNotification(for: habit)
     }
     
     func deleteHabit(at indexSet: IndexSet) {
-        // Remove notifications for deleted habits
-        for index in indexSet {
-            if index < habits.count {
-                NotificationManager.shared.removeNotifications(for: habits[index])
-            }
-        }
+        // Notifications removed
         
         habits.remove(atOffsets: indexSet)
         saveHabits()
@@ -50,8 +43,7 @@ class HabitStore: ObservableObject {
             habits[index].reminderEnabled = reminderEnabled
             saveHabits()
             
-            // Reschedule notification for the updated habit
-            NotificationManager.shared.scheduleNotification(for: habits[index])
+            // Notifications removed
         }
     }
     

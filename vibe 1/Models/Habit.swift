@@ -24,8 +24,10 @@ struct Habit: Identifiable, Codable {
     var descriptionText: String? = nil
     var invitedAllies: [String]? = []
     var reminderEnabled: Bool = true
+    // Creator of this habit (Firebase uid)
+    var createdByUserId: String? = nil
     
-    init(name: String, selectedDays: [String], timeOfDay: Date, frequencyPerWeek: Int, commitmentLevel: Int, colorIndex: Int = 0, completedDates: Set<String> = [], descriptionText: String? = nil, invitedAllies: [String]? = [], reminderEnabled: Bool = true) {
+    init(name: String, selectedDays: [String], timeOfDay: Date, frequencyPerWeek: Int, commitmentLevel: Int, colorIndex: Int = 0, completedDates: Set<String> = [], descriptionText: String? = nil, invitedAllies: [String]? = [], reminderEnabled: Bool = true, createdByUserId: String? = nil) {
         self.id = UUID()
         self.name = name
         self.selectedDays = selectedDays
@@ -40,6 +42,7 @@ struct Habit: Identifiable, Codable {
         self.descriptionText = descriptionText
         self.invitedAllies = invitedAllies
         self.reminderEnabled = reminderEnabled
+        self.createdByUserId = createdByUserId
     }
     
     // Legacy support for old format

@@ -12,7 +12,7 @@ import FirebaseAuth
 
 struct ProfileView: View {
     @ObservedObject var habitStore: HabitStore
-    @EnvironmentObject var notificationStore: NotificationStore
+    // Notifications removed
     @EnvironmentObject var authManager: AuthManager
     @State private var showingImagePicker = false
     @State private var showingCameraPicker = false
@@ -26,7 +26,7 @@ struct ProfileView: View {
     @State private var showingAllies = false
     @State private var allies: [String] = ["Alex", "Jordan", "Sam"]
     @State private var showingSettings = false
-    @State private var showingNotifications = false
+    // Notifications removed
     
     var currentStreak: Int {
         calculateCurrentStreak()
@@ -36,130 +36,8 @@ struct ProfileView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 32) {
-                    // Header Section
-                    VStack(spacing: 12) {
-                        // Profile Picture
-                        Button(action: {
-                            showingPhotoSource = true
-                        }) {
-                            ZStack {
-                                if let selectedImage = selectedImage {
-                                    Image(uiImage: selectedImage)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 120, height: 120)
-                                        .clipShape(Circle())
-                                } else {
-                                    Circle()
-                                        .fill(Color(.systemGray5))
-                                        .frame(width: 120, height: 120)
-                                        .overlay(
-                                            Image(systemName: "person.circle.fill")
-                                                .font(.system(size: 60))
-                                                .foregroundColor(.secondary)
-                                        )
-                                }
-                            }
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .confirmationDialog("Select Photo", isPresented: $showingPhotoSource, titleVisibility: .visible) {
-                            Button("Take Photo") { requestCameraAndPresent() }
-                            Button("Choose from Library") { requestPhotosAndPresent() }
-                            Button("Cancel", role: .cancel) {}
-                        }
-                        
-                        if selectedImage == nil {
-                            Button("Add photo") { showingPhotoSource = true }
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.blue)
-                        }
-                        
-                        // Username and Streak
-                        VStack(spacing: 12) {
-                            Text(username)
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.primary)
-                            
-                            // Streak Display
-                            HStack(spacing: 8) {
-                                Text("🔥")
-                                    .font(.system(size: 20))
-                                
-                                Text("\(currentStreak) day streak")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.orange)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color.orange.opacity(0.1))
-                            .cornerRadius(20)
-
-                            // Allies quick action
-                            Button(action: { showingAllies = true }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "person.2.fill")
-                                        .foregroundColor(.blue)
-                                    Text("Allies • \(allies.count)")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(.blue)
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.blue)
-                                }
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(18)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-                    .padding(.top, 20)
-                    
-                    // Stats Section
-                    VStack(spacing: 24) {
-                        Text("Your Progress")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.primary)
-                        
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 16) {
-                            // Total Habits
-                            StatCard(
-                                title: "Total Habits",
-                                value: "\(habitStore.habits.count)",
-                                icon: "list.bullet",
-                                color: .blue
-                            )
-                            
-                            // Completed Today
-                            StatCard(
-                                title: "Completed Today",
-                                value: "\(completedTodayCount)",
-                                icon: "checkmark.circle",
-                                color: .green
-                            )
-                            
-                            // Weekly Goal
-                            StatCard(
-                                title: "Weekly Goal",
-                                value: "\(weeklyGoalProgress)",
-                                icon: "target",
-                                color: .purple
-                            )
-                            
-                            // Best Streak
-                            StatCard(
-                                title: "Best Streak",
-                                value: "\(bestStreak)",
-                                icon: "flame",
-                                color: .orange
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 20)
+                    profileHeaderSection()
+                    statsSection()
                 }
                 .padding(.bottom, 40)
             }
@@ -173,33 +51,19 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsSheet(username: $username, authManager: authManager, requestPush: {
-                NotificationManager.shared.requestAuthorization()
+                // Notifications removed
             })
         }
         .sheet(isPresented: $showingAllies) {
             AlliesSheet()
         }
-        .sheet(isPresented: $showingNotifications) {
-            NotificationsView(notificationStore: notificationStore, habitStore: habitStore)
-        }
+        // Notifications sheet removed
         .alert("Change Username", isPresented: $showingUsernameAlert) {
             TextField("Username", text: $tempUsername)
             Button("Cancel", role: .cancel) { }
             Button("Save") {
                 username = tempUsername
                 saveUserData()
-                
-                // Also save to Firebase
-                if let uid = Auth.auth().currentUser?.uid {
-                    Task {
-                        do {
-                            try await AlliesService().upsertUser(uid: uid, username: username, avatarURL: nil)
-                            print("[Firebase] username updated to: \(username)")
-                        } catch {
-                            print("[Firebase] username update failed:", error.localizedDescription)
-                        }
-                    }
-                }
             }
         } message: {
             Text("Enter your username")
@@ -222,46 +86,7 @@ struct ProfileView: View {
                 }
             }
         }
-        .overlay(
-            HStack {
-                // Gear on the top-left
-                Button(action: { showingSettings = true }) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .frame(width: 36, height: 36)
-                        .background(Color(.systemGray6))
-                        .clipShape(Circle())
-                }
-                .padding(.leading, 20)
-                .padding(.top, 12)
-                Spacer()
-                // Test notification button (for debugging)
-                Button(action: { 
-                    notificationStore.createTestNotificationForCurrentUser()
-                }) {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.blue)
-                        .frame(width: 36, height: 36)
-                        .background(Color(.systemGray6))
-                        .clipShape(Circle())
-                }
-                .padding(.trailing, 8)
-                
-                // Bell on the top-right
-                Button(action: { showingNotifications = true }) {
-                    Image(systemName: "bell")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .frame(width: 36, height: 36)
-                        .background(Color(.systemGray6))
-                        .clipShape(Circle())
-                }
-                .padding(.trailing, 20)
-                .padding(.top, 8)
-            }, alignment: .top
-        )
+        .overlay(alignment: .top) { topOverlays() }
         .alert("Camera Access Needed", isPresented: $showCameraDeniedAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -390,6 +215,110 @@ struct ProfileView: View {
         if let imageData = UserDefaults.standard.data(forKey: "UserProfileImage"),
            let image = UIImage(data: imageData) {
             selectedImage = image
+        }
+    }
+}
+
+// MARK: - Extracted Sections
+extension ProfileView {
+    @ViewBuilder private func profileHeaderSection() -> some View {
+        VStack(spacing: 12) {
+            Button(action: { showingPhotoSource = true }) {
+                ZStack {
+                    if let selectedImage = selectedImage {
+                        Image(uiImage: selectedImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 120, height: 120)
+                            .clipShape(Circle())
+                    } else {
+                        Circle()
+                            .fill(Color(.systemGray5))
+                            .frame(width: 120, height: 120)
+                            .overlay(
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 60))
+                                    .foregroundColor(.secondary)
+                            )
+                    }
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            .confirmationDialog("Select Photo", isPresented: $showingPhotoSource, titleVisibility: .visible) {
+                Button("Take Photo") { requestCameraAndPresent() }
+                Button("Choose from Library") { requestPhotosAndPresent() }
+                Button("Cancel", role: .cancel) {}
+            }
+            
+            if selectedImage == nil {
+                Button("Add photo") { showingPhotoSource = true }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.blue)
+            }
+            
+            VStack(spacing: 12) {
+                Text(username)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.primary)
+                HStack(spacing: 8) {
+                    Text("🔥").font(.system(size: 20))
+                    Text("\(currentStreak) day streak")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(20)
+                Button(action: { showingAllies = true }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.2.fill").foregroundColor(.blue)
+                        Text("Allies • \(allies.count)")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.blue)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(18)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .padding(.top, 20)
+    }
+    
+    @ViewBuilder private func statsSection() -> some View {
+        VStack(spacing: 24) {
+            Text("Your Progress")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.primary)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                StatCard(title: "Total Habits", value: "\(habitStore.habits.count)", icon: "list.bullet", color: .blue)
+                StatCard(title: "Completed Today", value: "\(completedTodayCount)", icon: "checkmark.circle", color: .green)
+                StatCard(title: "Weekly Goal", value: "\(weeklyGoalProgress)", icon: "target", color: .purple)
+                StatCard(title: "Best Streak", value: "\(bestStreak)", icon: "flame", color: .orange)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    @ViewBuilder private func topOverlays() -> some View {
+        HStack {
+            Button(action: { showingSettings = true }) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.primary)
+                    .frame(width: 36, height: 36)
+                    .background(Color(.systemGray6))
+                    .clipShape(Circle())
+            }
+            .padding(.leading, 20)
+            .padding(.top, 12)
+            Spacer()
         }
     }
 }
@@ -553,14 +482,8 @@ struct SettingsSheet: View {
                         .foregroundColor(.red)
                 }
             }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
-            }
-            .onAppear { editingUsername = username }
             .alert("Sign Out", isPresented: $showingSignOutAlert) {
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel", role: .cancel) { }
                 Button("Sign Out", role: .destructive) {
                     do {
                         try authManager.signOut()
@@ -572,6 +495,12 @@ struct SettingsSheet: View {
             } message: {
                 Text("Are you sure you want to sign out?")
             }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
+            }
+            .onAppear { editingUsername = username }
         }
     }
 }
@@ -743,157 +672,7 @@ extension AlliesSheet {
     }
 }
 
-// MARK: - Notifications View
-struct NotificationsView: View {
-    @ObservedObject var notificationStore: NotificationStore
-    @ObservedObject var habitStore: HabitStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var selectedNotification: AppNotification?
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                if notificationStore.notifications.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "bell")
-                            .font(.system(size: 30))
-                            .foregroundColor(.secondary)
-                        Text("No notifications yet")
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemGroupedBackground))
-                } else {
-                    List {
-                        ForEach(notificationStore.notifications) { notification in
-                            NotificationRow(notification: notification, notificationStore: notificationStore)
-                                .onTapGesture {
-                                    if notification.type == .allyInvitation {
-                                        selectedNotification = notification
-                                    }
-                                }
-                        }
-                        .onDelete(perform: deleteNotifications)
-                    }
-                    .listStyle(.plain)
-                }
-            }
-            .navigationTitle("Notifications")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-                if !notificationStore.notifications.isEmpty {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Mark All Read") {
-                            notificationStore.markAllAsRead()
-                        }
-                        .font(.system(size: 16, weight: .medium))
-                    }
-                }
-            }
-        .onAppear {
-            notificationStore.fetchNotificationsFromFirebase()
-        }
-        }
-    }
-    
-    private func deleteNotifications(offsets: IndexSet) {
-        for index in offsets {
-            let notification = notificationStore.notifications[index]
-            notificationStore.deleteNotification(notification)
-        }
-    }
-}
-
-// MARK: - Notification Row
-struct NotificationRow: View {
-    let notification: AppNotification
-    @ObservedObject var notificationStore: NotificationStore
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Profile picture or icon
-            if notification.type == .allyInvitation, let avatarURL = notification.fromUserAvatarURL, !avatarURL.isEmpty {
-                // Show sender's profile picture for ally invitations
-                AsyncImage(url: URL(string: avatarURL)) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(.gray)
-                }
-                .frame(width: 32, height: 32)
-                .clipShape(Circle())
-            } else {
-                // Show generic icon for other notification types
-                Image(systemName: notification.type.icon)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(colorForType(notification.type))
-                    .frame(width: 32, height: 32)
-                    .background(colorForType(notification.type).opacity(0.1))
-                    .clipShape(Circle())
-            }
-            
-            // Content
-            VStack(alignment: .leading, spacing: 4) {
-                Text(notification.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.primary)
-                
-                Text(notification.message)
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-                
-                Text(timeAgoString(from: notification.timestamp))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            // Unread indicator
-            if !notification.isRead {
-                Circle()
-                    .fill(Color.blue)
-                    .frame(width: 8, height: 8)
-            }
-        }
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if !notification.isRead {
-                            notificationStore.markAsRead(notification)
-                        }
-                    }
-                    .background(
-                        notification.type == .allyInvitation ? 
-                        Color.blue.opacity(0.05) : Color.clear
-                    )
-    }
-    
-    private func colorForType(_ type: NotificationType) -> Color {
-        switch type {
-        case .allyInvitation:
-            return .blue
-        case .habitReminder:
-            return .orange
-        case .achievement:
-            return .yellow
-        }
-    }
-    
-    private func timeAgoString(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-}
-
 #Preview {
     ProfileView(habitStore: HabitStore())
+        .environmentObject(AuthManager())
 }

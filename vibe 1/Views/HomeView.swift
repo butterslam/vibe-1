@@ -9,10 +9,8 @@ import SwiftUI
 
 struct HomeView: View {
     @ObservedObject var habitStore: HabitStore
-    @EnvironmentObject var notificationStore: NotificationStore
     @State private var showingAddHabit = false
     @State private var showingCompletedSheet = false
-    @State private var showingNotifications = false
     
     var weekProgress: [Double] {
         calculateWeekProgress()
@@ -24,34 +22,23 @@ struct HomeView: View {
         return "\(completedToday)/\(todayHabits.count)"
     }
     
+    // Today lists (extracted to speed up type-checking and clarity)
+    private var scheduledToday: [Habit] {
+        getTodayHabits()
+    }
+    private var pendingToday: [Habit] {
+        scheduledToday.filter { !$0.isCompletedToday }
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 0) {
-                    // Top overlay actions (bell right)
+                    // Top overlay actions (removed notifications)
                     HStack {
                         Spacer()
-                        Button(action: { showingNotifications = true }) {
-                            ZStack {
-                                Image(systemName: "bell")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.primary)
-                                    .frame(width: 36, height: 36)
-                                    .background(Color(.systemGray6))
-                                    .clipShape(Circle())
-                                
-                                if notificationStore.unreadCount > 0 {
-                                    Text("\(notificationStore.unreadCount)")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .frame(width: 16, height: 16)
-                                        .background(Color.red)
-                                        .clipShape(Circle())
-                                        .offset(x: 12, y: -12)
-                                }
-                            }
-                        }
-                        .padding(.trailing, 20)
+                        // intentionally empty to keep spacing consistent
+                        Color.clear.frame(width: 36, height: 36).padding(.trailing, 20)
                     }
                     .padding(.top, 0)
                     
@@ -117,9 +104,7 @@ struct HomeView: View {
                         }
                         
                         // Habit cards (Today only)
-                        let scheduledToday = habitsFor(Date())
-                        let todays = scheduledToday.filter { !$0.isCompletedToday }
-                        if todays.isEmpty {
+                        if pendingToday.isEmpty {
                             VStack(spacing: 12) {
                                 Text("🔥 You're all done!")
                                     .font(.system(size: 18, weight: .semibold))
@@ -146,7 +131,7 @@ struct HomeView: View {
                             .padding(.vertical, 20)
                         } else {
                             LazyVStack(spacing: 12) {
-                                ForEach(todays) { habit in
+                                ForEach(pendingToday) { habit in
                                     HabitCardView(habit: habit, habitStore: habitStore, completionDisabled: false)
                                 }
                             }
@@ -201,9 +186,6 @@ struct HomeView: View {
             let scheduled = habitsFor(Date())
             let completed = scheduled.filter { $0.isCompletedToday }
             CompletedHabitsSheet(habitStore: habitStore, habits: completed)
-        }
-        .sheet(isPresented: $showingNotifications) {
-            NotificationsView(notificationStore: notificationStore, habitStore: habitStore)
         }
     }
     

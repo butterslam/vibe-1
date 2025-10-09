@@ -6,10 +6,22 @@
 //
 
 import SwiftUI
+import FirebaseAuth
 
 struct ContentView: View {
+    @State private var isLoggedIn: Bool = Auth.auth().currentUser != nil
+    
     var body: some View {
-        MainTabView()
+        Group {
+            if isLoggedIn {
+                MainTabView()
+            } else {
+                OnboardingView()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .AuthStateDidChange)) { _ in
+            isLoggedIn = Auth.auth().currentUser != nil
+        }
     }
 }
 

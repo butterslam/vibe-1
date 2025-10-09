@@ -12,7 +12,7 @@ import FirebaseFirestore
 struct AddHabitView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var habitStore: HabitStore
-    @EnvironmentObject var notificationStore: NotificationStore
+    // Notifications removed
     
     @State private var habitName = ""
     @State private var habitDescription = ""
@@ -419,35 +419,13 @@ struct AddHabitView: View {
             completedDates: [],
             descriptionText: habitDescription.isEmpty ? nil : habitDescription,
             invitedAllies: invitedNames,
-            reminderEnabled: !isReminderDisabled
+            reminderEnabled: !isReminderDisabled,
+            createdByUserId: Auth.auth().currentUser?.uid
         )
         
         habitStore.addHabit(newHabit)
         
-        // Send notifications to invited allies
-        if !invitedNames.isEmpty {
-            let currentUsername = getCurrentUsername()
-            for allyName in invitedNames {
-                if let allyUserId = invitedAllyData[allyName] {
-                    // Use the new function with user ID
-                    notificationStore.sendAllyInvitationNotification(
-                        to: allyUserId,
-                        allyUsername: allyName,
-                        habitName: habitName,
-                        fromUsername: currentUsername,
-                        habitId: newHabit.id
-                    )
-                } else {
-                    // Fallback to username lookup (for mock friends)
-                    notificationStore.sendAllyInvitationNotification(
-                        to: allyName,
-                        habitName: habitName,
-                        fromUsername: currentUsername,
-                        habitId: newHabit.id
-                    )
-                }
-            }
-        }
+        // Notifications removed
         
         // Show confetti animation
         withAnimation(.easeInOut(duration: 0.3)) {

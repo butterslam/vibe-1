@@ -9,6 +9,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var habitStore: HabitStore
+    @EnvironmentObject var authManager: AuthManager
     @State private var selectedTab: CustomTabBar.TabSelection = .home
     
     var body: some View {
@@ -24,6 +25,7 @@ struct MainTabView: View {
                     } else if selectedTab == .profile {
                         // Profile View
                         ProfileView(habitStore: habitStore)
+                            .environmentObject(authManager)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
