@@ -85,20 +85,36 @@ struct NotificationsView: View {
                         .padding(.horizontal, 20)
                         .padding(.bottom, 20)
                     }
+                    .refreshable {
+                        notificationStore.refreshNotifications()
+                    }
                 }
             }
             .navigationTitle("Notifications")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Mark All Read") {
-                        Task {
-                            try? await notificationStore.markAllAsRead()
+                    HStack {
+                        if notificationStore.isRefreshing {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Button("Refresh") {
+                                notificationStore.refreshNotifications()
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.blue)
                         }
+                        
+                        Button("Mark All Read") {
+                            Task {
+                                try? await notificationStore.markAllAsRead()
+                            }
+                        }
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.blue)
+                        .disabled(notificationStore.notifications.filter { !$0.isRead }.isEmpty)
                     }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.blue)
-                    .disabled(notificationStore.notifications.filter { !$0.isRead }.isEmpty)
                 }
             }
             .sheet(isPresented: $showingHabitInvitation) {

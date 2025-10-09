@@ -15,12 +15,21 @@ class NotificationStore: ObservableObject {
     @Published var notifications: [AppNotification] = []
     @Published var unreadCount: Int = 0
     @Published var isLoading: Bool = false
+    @Published var isRefreshing: Bool = false
     
     private let db = Firestore.firestore()
     private var notificationsListener: ListenerRegistration?
     private var cancellables = Set<AnyCancellable>()
     
+    // Cache management
+    private let cacheKey = "CachedNotifications"
+    private let maxCacheSize = 20
+    private var lastFetchTime: Date?
+    private let cacheExpirationTime: TimeInterval = 300 // 5 minutes
+    
     init() {
+        // Load cached notifications immediately
+        loadCachedNotifications()
         setupAuthListener()
     }
     
@@ -38,7 +47,7 @@ class NotificationStore: ObservableObject {
             
             if let user = user {
                 print("   Loading notifications for user: \(user.uid)")
-                self?.loadNotifications(for: user.uid)
+                self?.loadNotificationsWithCache(for: user.uid)
             } else {
                 print("   No user - clearing notifications")
                 self?.clearNotifications()
@@ -50,6 +59,7 @@ class NotificationStore: ObservableObject {
         notificationsListener?.remove()
         notifications = []
         unreadCount = 0
+        clearCachedNotifications()
     }
     
     // MARK: - Load Notifications
@@ -66,6 +76,7 @@ class NotificationStore: ObservableObject {
                 guard let self = self else { return }
                 
                 self.isLoading = false
+                self.isRefreshing = false
                 
                 if let error = error {
                     print("❌ Error loading notifications: \(error.localizedDescription)")
@@ -77,6 +88,7 @@ class NotificationStore: ObservableObject {
                 guard let documents = snapshot?.documents else {
                     self.notifications = []
                     self.updateUnreadCount()
+                    self.saveCachedNotifications()
                     return
                 }
                 
@@ -84,6 +96,7 @@ class NotificationStore: ObservableObject {
                     try? document.data(as: AppNotification.self)
                 }
                 self.updateUnreadCount()
+                self.saveCachedNotifications()
             }
     }
     
@@ -299,6 +312,63 @@ class NotificationStore: ObservableObject {
     
     private func declineGuildInvitation(_ notification: AppNotification) async throws {
         print("Declining guild invitation for guild: \(notification.guildId ?? "unknown")")
+    }
+    
+    // MARK: - Caching Methods
+    
+    private func loadNotificationsWithCache(for userId: String) {
+        // First, show cached notifications if available
+        if notifications.isEmpty {
+            loadCachedNotifications()
+        }
+        
+        // Then load fresh data from Firebase
+        loadNotifications(for: userId)
+    }
+    
+    private func loadCachedNotifications() {
+        guard let data = UserDefaults.standard.data(forKey: cacheKey),
+              let cachedNotifications = try? JSONDecoder().decode([AppNotification].self, from: data) else {
+            print("🔔 No cached notifications found")
+            return
+        }
+        
+        print("🔔 Loading \(cachedNotifications.count) cached notifications")
+        notifications = cachedNotifications
+        updateUnreadCount()
+    }
+    
+    private func saveCachedNotifications() {
+        // Only cache the most recent notifications
+        let notificationsToCache = Array(notifications.prefix(maxCacheSize))
+        
+        guard let data = try? JSONEncoder().encode(notificationsToCache) else {
+            print("🔔 Failed to encode notifications for caching")
+            return
+        }
+        
+        UserDefaults.standard.set(data, forKey: cacheKey)
+        lastFetchTime = Date()
+        print("🔔 Cached \(notificationsToCache.count) notifications")
+    }
+    
+    private func clearCachedNotifications() {
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+        lastFetchTime = nil
+        print("🔔 Cleared cached notifications")
+    }
+    
+    private func shouldRefreshCache() -> Bool {
+        guard let lastFetch = lastFetchTime else { return true }
+        return Date().timeIntervalSince(lastFetch) > cacheExpirationTime
+    }
+    
+    // Public method for manual refresh
+    func refreshNotifications() {
+        guard let currentUser = Auth.auth().currentUser else { return }
+        
+        isRefreshing = true
+        loadNotifications(for: currentUser.uid)
     }
 }
 

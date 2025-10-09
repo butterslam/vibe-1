@@ -17,7 +17,7 @@ struct HabitInvitationView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 18) {
                     // Header with habit name
                     VStack(spacing: 8) {
                         Text(habit.name)
@@ -70,7 +70,8 @@ struct HabitInvitationView: View {
                                 .foregroundColor(.green)
                                 .cornerRadius(8)
                         }
-                        .padding()
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                         .background(Color(.systemGray6))
                         .cornerRadius(12)
                         
@@ -109,7 +110,8 @@ struct HabitInvitationView: View {
                                         .foregroundColor(user.status.color)
                                         .cornerRadius(8)
                                 }
-                                .padding()
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
                                 .background(Color(.systemGray6))
                                 .cornerRadius(12)
                             }
