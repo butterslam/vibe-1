@@ -410,6 +410,11 @@ struct HabitCardView: View {
                         .foregroundColor(.primary)
                         .lineLimit(2)
                     
+                    // Ally indicator (if there are allies)
+                    if let allies = habit.invitedAllies, !allies.isEmpty {
+                        AllyIndicator(allyCount: allies.count)
+                    }
+                    
                     // Day indicators
                     HStack(spacing: 4) {
                         ForEach(0..<7) { index in
@@ -666,6 +671,12 @@ struct CompletedHabitCard: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
                     .lineLimit(2)
+                
+                // Ally indicator (if there are allies)
+                if let allies = habit.invitedAllies, !allies.isEmpty {
+                    AllyIndicator(allyCount: allies.count)
+                }
+                
                 // Selected days display (no interaction)
                 HStack(spacing: 4) {
                     ForEach(["M","T","W","T","F","S","S"], id: \.self) { d in
