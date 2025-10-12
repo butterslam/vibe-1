@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import FirebaseAuth
 
 struct HabitInvitationView: View {
     let habit: Habit
@@ -13,6 +14,7 @@ struct HabitInvitationView: View {
     let invitedUsers: [InvitedUser]
     @State private var selectedReminderTime: Date = Date()
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject var habitStore: HabitStore
     
     var body: some View {
         NavigationView {
@@ -182,8 +184,8 @@ struct HabitInvitationView: View {
                     // Action buttons
                     VStack(spacing: 16) {
                         Button(action: {
-                            // Accept habit action
-                            dismiss()
+                            // Accept habit action - add the habit to the user's habit store
+                            acceptHabitInvitation()
                         }) {
                             Text("Accept Habit")
                                 .font(.headline)
@@ -196,7 +198,7 @@ struct HabitInvitationView: View {
                         
                         Button(action: {
                             // Decline habit action
-                            dismiss()
+                            declineHabitInvitation()
                         }) {
                             Text("Decline")
                                 .font(.headline)
@@ -216,6 +218,41 @@ struct HabitInvitationView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - Action Methods
+    
+    private func acceptHabitInvitation() {
+        // Create a completely new habit instance for the current user
+        // Preserve the original creator's information
+        let acceptedHabit = Habit(
+            name: habit.name,
+            selectedDays: habit.selectedDays,
+            timeOfDay: habit.timeOfDay,
+            frequencyPerWeek: habit.frequencyPerWeek,
+            commitmentLevel: habit.commitmentLevel,
+            colorIndex: habit.colorIndex,
+            completedDates: [], // Reset completion dates for new user
+            descriptionText: habit.descriptionText,
+            invitedAllies: habit.invitedAllies?.filter { $0 != (UserDefaults.standard.string(forKey: "UserUsername") ?? "") },
+            reminderEnabled: habit.reminderEnabled,
+            createdByUserId: habit.createdByUserId, // Keep original creator's ID
+            ownerUserId: Auth.auth().currentUser?.uid, // Set current user as owner
+            originalCreatorUsername: inviterUsername, // Preserve original creator's username
+            originalCreatorUserId: habit.createdByUserId // Preserve original creator's user ID
+        )
+        
+        // Add the habit to the user's habit store
+        habitStore.addHabit(acceptedHabit)
+        
+        // Dismiss the view
+        dismiss()
+    }
+    
+    private func declineHabitInvitation() {
+        // For now, just dismiss the view
+        // In the future, you might want to send a decline notification back to the inviter
+        dismiss()
     }
 }
 
@@ -270,6 +307,7 @@ enum InvitationStatus {
         invitedUsers: [
             InvitedUser(username: "yoyo", status: .accepted),
             InvitedUser(username: "alex", status: .pending)
-        ]
+        ],
+        habitStore: HabitStore()
     )
 }

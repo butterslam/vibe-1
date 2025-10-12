@@ -77,7 +77,7 @@ class HabitStore: ObservableObject {
     func updateHabit(_ habit: Habit, name: String, timeOfDay: Date, selectedDays: [String], colorIndex: Int, descriptionText: String?, invitedAllies: [String]?, reminderEnabled: Bool) {
         guard let currentUser = Auth.auth().currentUser,
               let index = habits.firstIndex(where: { $0.id == habit.id }),
-              habits[index].createdByUserId == currentUser.uid else { return }
+              habits[index].ownerUserId == currentUser.uid else { return }
         
         habits[index].name = name
         habits[index].timeOfDay = timeOfDay
@@ -101,7 +101,7 @@ class HabitStore: ObservableObject {
     func toggleHabitCompletion(_ habit: Habit) {
         guard let currentUser = Auth.auth().currentUser,
               let index = habits.firstIndex(where: { $0.id == habit.id }),
-              habits[index].createdByUserId == currentUser.uid else { return }
+              habits[index].ownerUserId == currentUser.uid else { return }
         
         let wasCompleted = habits[index].isCompletedToday
         habits[index].isCompletedToday.toggle()
@@ -133,7 +133,7 @@ class HabitStore: ObservableObject {
     func toggleHabit(_ habit: Habit, on date: Date) {
         guard let currentUser = Auth.auth().currentUser,
               let index = habits.firstIndex(where: { $0.id == habit.id }),
-              habits[index].createdByUserId == currentUser.uid else { return }
+              habits[index].ownerUserId == currentUser.uid else { return }
         
         let key = Self.dateKey(date)
         if habits[index].completedDates.contains(key) {
@@ -185,7 +185,7 @@ class HabitStore: ObservableObject {
         habitsListener?.remove()
         
         habitsListener = db.collection("habits")
-            .whereField("createdByUserId", isEqualTo: userId)
+            .whereField("ownerUserId", isEqualTo: userId)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
                 
@@ -225,7 +225,10 @@ class HabitStore: ObservableObject {
             "descriptionText": habit.descriptionText as Any,
             "invitedAllies": habit.invitedAllies as Any,
             "reminderEnabled": habit.reminderEnabled,
-            "createdByUserId": currentUser.uid
+            "createdByUserId": habit.createdByUserId ?? currentUser.uid,
+            "ownerUserId": habit.ownerUserId ?? currentUser.uid,
+            "originalCreatorUsername": habit.originalCreatorUsername as Any,
+            "originalCreatorUserId": habit.originalCreatorUserId as Any
         ]
         
         try await db.collection("habits").document(habit.id.uuidString).setData(habitData)
@@ -244,7 +247,9 @@ class HabitStore: ObservableObject {
             "completedDates": Array(habit.completedDates),
             "descriptionText": habit.descriptionText as Any,
             "invitedAllies": habit.invitedAllies as Any,
-            "reminderEnabled": habit.reminderEnabled
+            "reminderEnabled": habit.reminderEnabled,
+            "originalCreatorUsername": habit.originalCreatorUsername as Any,
+            "originalCreatorUserId": habit.originalCreatorUserId as Any
         ]
         
         try await db.collection("habits").document(habit.id.uuidString).updateData(habitData)

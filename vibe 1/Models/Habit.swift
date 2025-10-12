@@ -26,8 +26,14 @@ struct Habit: Identifiable, Codable {
     var reminderEnabled: Bool = true
     // Creator of this habit (Firebase uid)
     var createdByUserId: String? = nil
+    // Owner of this habit instance (who can edit it) - for accepted habits, this is the current user
+    var ownerUserId: String? = nil
+    // Original creator's username (for display purposes)
+    var originalCreatorUsername: String? = nil
+    // Original creator's user ID (for accepted habits)
+    var originalCreatorUserId: String? = nil
     
-    init(name: String, selectedDays: [String], timeOfDay: Date, frequencyPerWeek: Int, commitmentLevel: Int, colorIndex: Int = 0, completedDates: Set<String> = [], descriptionText: String? = nil, invitedAllies: [String]? = [], reminderEnabled: Bool = true, createdByUserId: String? = nil) {
+    init(name: String, selectedDays: [String], timeOfDay: Date, frequencyPerWeek: Int, commitmentLevel: Int, colorIndex: Int = 0, completedDates: Set<String> = [], descriptionText: String? = nil, invitedAllies: [String]? = [], reminderEnabled: Bool = true, createdByUserId: String? = nil, ownerUserId: String? = nil, originalCreatorUsername: String? = nil, originalCreatorUserId: String? = nil) {
         self.id = UUID()
         self.name = name
         self.selectedDays = selectedDays
@@ -43,6 +49,9 @@ struct Habit: Identifiable, Codable {
         self.invitedAllies = invitedAllies
         self.reminderEnabled = reminderEnabled
         self.createdByUserId = createdByUserId
+        self.ownerUserId = ownerUserId
+        self.originalCreatorUsername = originalCreatorUsername
+        self.originalCreatorUserId = originalCreatorUserId
     }
     
     // Legacy support for old format

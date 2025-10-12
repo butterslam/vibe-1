@@ -19,6 +19,7 @@ class NotificationStore: ObservableObject {
     
     private let db = Firestore.firestore()
     private var notificationsListener: ListenerRegistration?
+    private var authStateListener: AuthStateDidChangeListenerHandle?
     private var cancellables = Set<AnyCancellable>()
     
     // Cache management
@@ -35,12 +36,15 @@ class NotificationStore: ObservableObject {
     
     deinit {
         notificationsListener?.remove()
+        if let authStateListener = authStateListener {
+            Auth.auth().removeStateDidChangeListener(authStateListener)
+        }
     }
     
     // MARK: - Auth State Management
     
     private func setupAuthListener() {
-        Auth.auth().addStateDidChangeListener { [weak self] _, user in
+        authStateListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             print("🔔 NotificationStore Auth State Changed:")
             print("   User: \(user?.uid ?? "nil")")
             print("   Email: \(user?.email ?? "nil")")
@@ -265,9 +269,66 @@ class NotificationStore: ObservableObject {
     // MARK: - Action Handlers
     
     private func acceptHabitInvitation(_ notification: AppNotification) async throws {
-        // This would integrate with your habit system
-        // For now, just mark as read
-        print("Accepting habit invitation for habit: \(notification.habitId ?? "unknown")")
+        guard let currentUser = Auth.auth().currentUser,
+              let habitId = notification.habitId else {
+            print("❌ Cannot accept habit invitation: missing user or habit ID")
+            return
+        }
+        
+        print("✅ Accepting habit invitation for habit: \(habitId)")
+        
+        // Fetch the habit from Firebase
+        let habitDoc = try await db.collection("habits").document(habitId).getDocument()
+        guard habitDoc.exists,
+              let habitData = habitDoc.data() else {
+            print("❌ Habit not found in Firebase: \(habitId)")
+            return
+        }
+        
+        // Create a completely new habit instance for the current user
+        let originalHabit = try habitDoc.data(as: Habit.self)
+        let acceptedHabit = Habit(
+            name: originalHabit.name,
+            selectedDays: originalHabit.selectedDays,
+            timeOfDay: originalHabit.timeOfDay,
+            frequencyPerWeek: originalHabit.frequencyPerWeek,
+            commitmentLevel: originalHabit.commitmentLevel,
+            colorIndex: originalHabit.colorIndex,
+            completedDates: [], // Reset completion dates for new user
+            descriptionText: originalHabit.descriptionText,
+            invitedAllies: originalHabit.invitedAllies?.filter { $0 != (UserDefaults.standard.string(forKey: "UserUsername") ?? "") },
+            reminderEnabled: originalHabit.reminderEnabled,
+            createdByUserId: originalHabit.createdByUserId, // Keep original creator's ID
+            ownerUserId: currentUser.uid, // Set current user as owner
+            originalCreatorUsername: notification.senderUsername, // Preserve original creator's username
+            originalCreatorUserId: originalHabit.createdByUserId // Preserve original creator's user ID
+        )
+        
+        // Save the habit to the current user's habits collection
+        let habitDataForUser: [String: Any] = [
+            "id": acceptedHabit.id.uuidString,
+            "name": acceptedHabit.name,
+            "selectedDays": acceptedHabit.selectedDays,
+            "timeOfDay": acceptedHabit.timeOfDay,
+            "frequencyPerWeek": acceptedHabit.frequencyPerWeek,
+            "commitmentLevel": acceptedHabit.commitmentLevel,
+            "createdAt": acceptedHabit.createdAt,
+            "isCompletedToday": false, // Reset completion status for new user
+            "completedDate": NSNull(),
+            "colorIndex": acceptedHabit.colorIndex,
+            "completedDates": [], // Reset completion dates for new user
+            "descriptionText": acceptedHabit.descriptionText as Any,
+            "invitedAllies": acceptedHabit.invitedAllies as Any,
+            "reminderEnabled": acceptedHabit.reminderEnabled,
+            "createdByUserId": acceptedHabit.createdByUserId, // Use the original creator's ID
+            "ownerUserId": acceptedHabit.ownerUserId, // Use the current user as owner
+            "originalCreatorUsername": acceptedHabit.originalCreatorUsername as Any,
+            "originalCreatorUserId": acceptedHabit.originalCreatorUserId as Any
+        ]
+        
+        try await db.collection("habits").document(acceptedHabit.id.uuidString).setData(habitDataForUser)
+        
+        print("✅ Successfully accepted habit invitation and added to user's habits")
     }
     
     private func declineHabitInvitation(_ notification: AppNotification) async throws {

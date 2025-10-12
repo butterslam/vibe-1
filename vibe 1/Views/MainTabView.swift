@@ -24,7 +24,7 @@ struct MainTabView: View {
                     } else if selectedTab == .guilds {
                         GuildsView()
                     } else if selectedTab == .notifications {
-                        NotificationsView()
+                        NotificationsView(habitStore: habitStore)
                             .environmentObject(notificationStore)
                     } else if selectedTab == .profile {
                         // Profile View

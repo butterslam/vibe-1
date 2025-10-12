@@ -53,6 +53,7 @@ extension EditHabitView {
 //
 
 import SwiftUI
+import FirebaseAuth
 
 struct EditHabitView: View {
     @Environment(\.dismiss) private var dismiss
@@ -129,17 +130,49 @@ struct EditHabitView: View {
                                     }
                             }
 
-                            // Allies Section
+                            // Participants Section
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Allies")
+                                Text("Participants")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.primary)
                                 
-                                VStack(alignment: .leading, spacing: 10) {
-                                    AllyRow(username: currentUserDisplayName(), isPrimary: true)
-                                    ForEach(invitedAllies, id: \.self) { name in
-                                        AllyRow(username: name, isPrimary: false)
+                                HStack(spacing: 12) {
+                                    // Overlapped profile photos
+                                    ZStack {
+                                        // Current user's profile photo (back)
+                                        Circle()
+                                            .fill(Color.blue.opacity(0.15))
+                                            .frame(width: 40, height: 40)
+                                            .overlay(
+                                                Text(getCurrentUserInitials())
+                                                    .font(.system(size: 14, weight: .bold))
+                                                    .foregroundColor(.blue)
+                                            )
+                                        
+                                        // Creator's profile photo (front, slightly offset)
+                                        Circle()
+                                            .fill(Color.green.opacity(0.15))
+                                            .frame(width: 40, height: 40)
+                                            .overlay(
+                                                Text(getCreatorInitials())
+                                                    .font(.system(size: 14, weight: .bold))
+                                                    .foregroundColor(.green)
+                                            )
+                                            .offset(x: 8, y: 0)
                                     }
+                                    
+                                    // Text showing participants
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(getParticipantsText())
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundColor(.primary)
+                                        
+                                        Text("\(getTotalParticipantsCount()) participants")
+                                            .font(.system(size: 12, weight: .regular))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer()
                                 }
                                 .padding(12)
                                 .background(Color(.systemGray6))
@@ -392,11 +425,113 @@ struct EditHabitView: View {
         }
         dismiss()
     }
-}
-
-private func currentUserDisplayName() -> String {
-    // Placeholder for current user; replace with real profile name when available
-    return "You"
+    
+    private func getCreatorDisplayName() -> String {
+        // Debug logging
+        print("🔍 getCreatorDisplayName Debug:")
+        print("   originalCreatorUsername: '\(habit.originalCreatorUsername ?? "nil")'")
+        print("   originalCreatorUserId: '\(habit.originalCreatorUserId ?? "nil")'")
+        print("   createdByUserId: '\(habit.createdByUserId ?? "nil")'")
+        
+        // If this is an accepted habit (has original creator info), show the original creator
+        if let originalCreatorUsername = habit.originalCreatorUsername {
+            print("   Returning originalCreatorUsername: '\(originalCreatorUsername)'")
+            return originalCreatorUsername
+        }
+        
+        // For habits created by the current user, get the current user's username
+        let currentUsername = UserDefaults.standard.string(forKey: "UserUsername") ?? "Creator"
+        print("   No originalCreatorUsername, returning current username: '\(currentUsername)'")
+        return currentUsername
+    }
+    
+    private func getCurrentUserInitials() -> String {
+        let currentUsername = UserDefaults.standard.string(forKey: "UserUsername") ?? "You"
+        return getInitials(for: currentUsername)
+    }
+    
+    private func getCreatorInitials() -> String {
+        let creatorName = getCreatorDisplayName()
+        return getInitials(for: creatorName)
+    }
+    
+    private func getParticipantsText() -> String {
+        let currentUsername = UserDefaults.standard.string(forKey: "UserUsername") ?? "You"
+        let creatorName = getCreatorDisplayName()
+        
+        // Debug logging
+        print("🔍 getParticipantsText Debug:")
+        print("   Current username: '\(currentUsername)'")
+        print("   Creator name: '\(creatorName)'")
+        print("   Invited allies: \(invitedAllies)")
+        print("   Habit ID: '\(habit.id)'")
+        
+        // Check if this is an accepted habit by looking for originalCreatorUsername
+        let isAcceptedHabit = habit.originalCreatorUsername != nil
+        let currentUserId = Auth.auth().currentUser?.uid
+        
+        print("   Current user ID: '\(currentUserId ?? "nil")'")
+        print("   Habit created by user ID: '\(habit.createdByUserId ?? "nil")'")
+        print("   Habit owner user ID: '\(habit.ownerUserId ?? "nil")'")
+        print("   Is accepted habit? \(isAcceptedHabit)")
+        
+        // Additional debugging for accepted habits
+        if let originalCreatorUsername = habit.originalCreatorUsername {
+            print("   ✅ This is an accepted habit - originalCreatorUsername: '\(originalCreatorUsername)'")
+        } else {
+            print("   ❌ No originalCreatorUsername - this is a self-created habit")
+        }
+        
+        if !isAcceptedHabit {
+            // For self-created habits, show "You" and any invited allies
+            if invitedAllies.isEmpty {
+                return "You"
+            } else if invitedAllies.count == 1 {
+                return "You, \(invitedAllies[0])"
+            } else {
+                return "You, \(invitedAllies[0]) and \(invitedAllies.count - 1) others"
+            }
+        } else {
+            // For accepted habits, show "You" and the original creator
+            // The invitedAllies here are OTHER people invited by the creator, not the creator themselves
+            if invitedAllies.isEmpty {
+                // Just "You" and the creator
+                return "You, \(creatorName)"
+            } else {
+                // "You", creator, and other invited allies
+                return "You, \(creatorName) and \(invitedAllies.count) others"
+            }
+        }
+    }
+    
+    private func getTotalParticipantsCount() -> Int {
+        // Check if this is an accepted habit by looking for originalCreatorUsername
+        let isAcceptedHabit = habit.originalCreatorUsername != nil
+        
+        print("🔍 getTotalParticipantsCount Debug:")
+        print("   Is accepted habit? \(isAcceptedHabit)")
+        print("   Invited allies: \(invitedAllies)")
+        print("   Invited allies count: \(invitedAllies.count)")
+        
+        // If the current user is the creator, count is 1 + invited allies
+        if !isAcceptedHabit {
+            let count = 1 + invitedAllies.count
+            print("   Self-created habit count: \(count)")
+            return count
+        }
+        
+        // For accepted habits, count is 2 (current user + creator) + other invited allies
+        let count = 2 + invitedAllies.count
+        print("   Accepted habit count: \(count)")
+        return count
+    }
+    
+    private func getInitials(for name: String) -> String {
+        let parts = name.split(separator: " ")
+        let first = parts.first?.first.map(String.init) ?? ""
+        let last = parts.dropFirst().first?.first.map(String.init) ?? ""
+        return (first + last).uppercased()
+    }
 }
 
 struct AllyRow: View {

@@ -11,6 +11,7 @@ import FirebaseAuth
 
 struct NotificationsView: View {
     @EnvironmentObject var notificationStore: NotificationStore
+    @ObservedObject var habitStore: HabitStore
     @State private var selectedFilter: NotificationFilter = .all
     @State private var showingHabitInvitation: Bool = false
     @State private var selectedHabit: Habit?
@@ -133,7 +134,8 @@ struct NotificationsView: View {
                     HabitInvitationView(
                         habit: habit,
                         inviterUsername: selectedInviterUsername,
-                        invitedUsers: selectedInvitedUsers
+                        invitedUsers: selectedInvitedUsers,
+                        habitStore: habitStore
                     )
                 } else {
                     // Show error state
@@ -479,6 +481,6 @@ struct EmptyNotificationsView: View {
 
 
 #Preview {
-    NotificationsView()
+    NotificationsView(habitStore: HabitStore())
         .environmentObject(NotificationStore())
 }
